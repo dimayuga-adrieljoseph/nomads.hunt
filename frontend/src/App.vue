@@ -1,85 +1,124 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import { RouterView, RouterLink, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const auth   = useAuthStore()
+const router = useRouter()
+
+async function handleLogout() {
+  await auth.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <nav class="nav">
+    <div class="container nav__inner">
+      <!-- Brand -->
+      <RouterLink to="/" class="nav__brand">
+        <span class="nav__brand-text">NOMADS<span class="nav__brand-dot">.</span>HUNT</span>
+      </RouterLink>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
+      <!-- Links -->
+      <div class="nav__links">
+        <RouterLink to="/" class="nav__link">Catalog</RouterLink>
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
+        <template v-if="auth.isLoggedIn && auth.isCustomer">
+          <RouterLink to="/my-claims" class="nav__link">My Claims</RouterLink>
+          <RouterLink to="/my-orders" class="nav__link">My Orders</RouterLink>
+        </template>
+
+        <template v-if="auth.isLoggedIn && auth.isAdmin">
+          <RouterLink to="/admin" class="nav__link nav__link--admin">Admin</RouterLink>
+        </template>
+      </div>
+
+      <!-- Auth -->
+      <div class="nav__auth">
+        <template v-if="!auth.isLoggedIn">
+          <RouterLink to="/login" class="btn btn--ghost btn--sm">Log In</RouterLink>
+          <RouterLink to="/register" class="btn btn--primary btn--sm">Register</RouterLink>
+        </template>
+
+        <template v-else>
+          <RouterLink
+            v-if="auth.isCustomer"
+            to="/profile"
+            class="nav__user"
+          >
+            {{ auth.user?.name }}
+          </RouterLink>
+          <span v-else class="nav__user">{{ auth.user?.name }}</span>
+          <button class="btn btn--ghost btn--sm" @click="handleLogout">Log Out</button>
+        </template>
+      </div>
     </div>
-  </header>
+  </nav>
 
-  <RouterView />
+  <main>
+    <RouterView />
+  </main>
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--nav-height);
+  background: rgba(14, 14, 14, .92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+.nav__inner {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 1.5rem;
 }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
+.nav__brand {
+  flex-shrink: 0;
 }
-
-nav a.router-link-exact-active {
+.nav__brand-text {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: .08em;
   color: var(--color-text);
 }
+.nav__brand-dot { color: var(--color-mine); }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.nav__links {
+  display: flex;
+  gap: 1.25rem;
+  flex: 1;
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+.nav__link {
+  font-size: .875rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  transition: color .15s;
+}
+.nav__link:hover,
+.nav__link.router-link-active { color: var(--color-text); }
+
+.nav__link--admin {
+  color: var(--color-mine);
 }
 
-nav a:first-of-type {
-  border: 0;
+.nav__auth {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-shrink: 0;
 }
 
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
+.nav__user {
+  font-size: .85rem;
+  color: var(--color-muted);
 }
 </style>

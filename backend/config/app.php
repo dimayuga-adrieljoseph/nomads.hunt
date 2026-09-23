@@ -123,4 +123,15 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Claim Hold Duration
+    |--------------------------------------------------------------------------
+    |
+    | Number of seconds an active claim (Mine / Steal / Grab) is held before
+    | it expires and the queue advances. Configurable for demo purposes.
+    |
+    */
+    'claim_hold_seconds' => (int) env('CLAIM_HOLD_SECONDS', 300),
+
 ];
