@@ -121,7 +121,7 @@ class StealClaimTest extends TestCase
         $this->assertEquals(2, $steal2->position);
     }
 
-    /** Steal expiration advances to next steal in queue */
+    /** Steal expiration (payment stage) advances to next steal in queue */
     public function test_steal_expiration_advances_steal_queue(): void
     {
         $product   = $this->makeProduct();
@@ -129,18 +129,28 @@ class StealClaimTest extends TestCase
         $stealer1  = $this->makeCustomer('s1@test.com');
         $stealer2  = $this->makeCustomer('s2@test.com');
 
-        $this->claimService->mine($product, $miner);
+        $mine  = $this->claimService->mine($product, $miner);
         $steal1 = $this->claimService->steal($product, $stealer1);
         $steal2 = $this->claimService->steal($product, $stealer2);
 
+        // Stage 1: steal 1 enters its payment window — steal 2 keeps waiting
+        $this->claimService->expireClaim($steal1);
+        $this->assertEquals('active', $steal1->fresh()->status);
+        $this->assertEquals('payment', $steal1->fresh()->phase);
+        $this->assertEquals('waiting', $steal2->fresh()->status);
+
+        // Stage 2: the payment window lapses → steal 2 becomes the active claimant
         $this->claimService->expireClaim($steal1);
 
         $this->assertEquals('expired', $steal1->fresh()->status);
         $this->assertEquals('active',  $steal2->fresh()->status);
-        $this->assertNotNull($steal2->fresh()->expires_at);
+        // Steal 2 starts with a brand new CLAIM stage, not a payment window
+        $this->assertEquals('claim', $steal2->fresh()->phase);
+        $this->assertNotNull($steal2->fresh()->claim_expires_at);
+        $this->assertNull($steal2->fresh()->order);
     }
 
-    /** When last Steal expires, product returns to AVAILABLE */
+    /** When the last Steal's payment lapses, product returns to AVAILABLE */
     public function test_last_steal_expiry_returns_product_to_available(): void
     {
         $product  = $this->makeProduct();
@@ -149,8 +159,12 @@ class StealClaimTest extends TestCase
 
         $this->claimService->mine($product, $miner);
         $steal = $this->claimService->steal($product, $stealer);
-        $this->claimService->expireClaim($steal);
 
+        $this->claimService->expireClaim($steal);   // claim stage → payment window
+        $this->assertEquals('payment', $steal->fresh()->phase);
+        $this->assertEquals('steal_pending', $product->fresh()->status);
+
+        $this->claimService->expireClaim($steal);   // payment window → expired
         $this->assertEquals('available', $product->fresh()->status);
     }
 
@@ -164,8 +178,8 @@ class StealClaimTest extends TestCase
         $this->claimService->steal($product, $stealer);
     }
 
-    /** Steal creates a pending Order for the active claimant */
-    public function test_steal_creates_pending_order(): void
+    /** Steal starts its own CLAIM stage — no instant payment window */
+    public function test_steal_starts_claim_stage_without_order(): void
     {
         $product  = $this->makeProduct();
         $miner    = $this->makeCustomer('m@test.com');
@@ -174,6 +188,17 @@ class StealClaimTest extends TestCase
         $this->claimService->mine($product, $miner);
         $steal = $this->claimService->steal($product, $stealer);
 
+        $this->assertEquals('active', $steal->status);
+        $this->assertEquals('claim', $steal->phase);
+        $this->assertNotNull($steal->claim_expires_at);
+        $this->assertNull($steal->payment_expires_at);
+        $this->assertNull($steal->order);
+
+        // …and only opens a payment window once the claim stage ends
+        $this->claimService->expireClaim($steal);
+        $steal->refresh();
+
+        $this->assertEquals('payment', $steal->phase);
         $this->assertNotNull($steal->order);
         $this->assertEquals('pending', $steal->order->payment_status);
         $this->assertEquals(1200, $steal->order->amount);
@@ -188,7 +213,10 @@ class StealClaimTest extends TestCase
 
         $this->claimService->mine($product, $miner);
         $steal = $this->claimService->steal($product, $stealer);
-        $order = $steal->order;
+
+        // Survive the claim stage first
+        $this->claimService->expireClaim($steal);
+        $order = $steal->fresh()->order;
 
         $this->actingAs($stealer, 'sanctum')
             ->postJson("/api/orders/{$order->id}/pay")

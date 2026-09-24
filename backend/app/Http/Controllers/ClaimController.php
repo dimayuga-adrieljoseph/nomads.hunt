@@ -19,12 +19,13 @@ class ClaimController extends Controller
     {
         try {
             $claim = $this->claimService->mine($product, $request->user());
+            $claim->load('order');
 
             return response()->json([
                 'message' => $claim->status === Claim::STATUS_ACTIVE
-                    ? 'Mine claim activated. You have ' . config('app.claim_hold_seconds') . ' seconds to pay.'
+                    ? 'Mine claim activated. Hold the piece for ' . config('app.claim_seconds') . ' seconds — your payment window opens when the claim period ends.'
                     : 'You have been added to the Mine queue.',
-                'claim'   => $this->formatClaim($claim),
+                'claim'   => $this->formatClaim($claim, true),
             ], 201);
         } catch (ClaimException $e) {
             return response()->json([
@@ -40,12 +41,13 @@ class ClaimController extends Controller
     {
         try {
             $claim = $this->claimService->steal($product, $request->user());
+            $claim->load('order');
 
             return response()->json([
                 'message' => $claim->status === Claim::STATUS_ACTIVE
-                    ? 'Steal activated! All Mine claims have been overridden. You have ' . config('app.claim_hold_seconds') . ' seconds to pay.'
+                    ? 'Steal activated! All Mine claims have been overridden. Hold it for ' . config('app.claim_seconds') . ' seconds — your payment window opens when the claim period ends.'
                     : 'You have been added to the Steal queue.',
-                'claim'   => $this->formatClaim($claim),
+                'claim'   => $this->formatClaim($claim, true),
             ], 201);
         } catch (ClaimException $e) {
             return response()->json([
@@ -61,10 +63,11 @@ class ClaimController extends Controller
     {
         try {
             $claim = $this->claimService->grab($product, $request->user());
+            $claim->load('order');
 
             return response()->json([
-                'message' => 'Grab activated! You have ' . config('app.claim_hold_seconds') . ' seconds to complete payment.',
-                'claim'   => $this->formatClaim($claim),
+                'message' => 'Grab activated! You have ' . config('app.payment_seconds') . ' seconds to complete payment.',
+                'claim'   => $this->formatClaim($claim, true),
             ], 201);
         } catch (ClaimException $e) {
             return response()->json([
@@ -81,6 +84,10 @@ class ClaimController extends Controller
      */
     public function productClaims(Product $product): JsonResponse
     {
+        // Never show a stale claim as active — expire first, then repair status
+        $this->claimService->expireOverdueClaimsForProduct($product->id);
+        $this->claimService->reconcileProductStatus($product);
+
         $claims = $product->claims()
             ->with('user:id,name')
             ->orderByDesc('created_at')
@@ -97,6 +104,10 @@ class ClaimController extends Controller
      */
     public function myClaims(Request $request): JsonResponse
     {
+        // Advance any queue this customer is waiting on before answering, so a
+        // finished countdown immediately turns into an active claim + payment.
+        $this->claimService->expireOverdueClaimsForUser($request->user());
+
         $claims = Claim::where('user_id', $request->user()->id)
             ->with(['product:id,name,image,status', 'order'])
             ->orderByDesc('created_at')
@@ -128,6 +139,13 @@ class ClaimController extends Controller
             'position'   => $claim->position,
             'status'     => $claim->status,
             'amount'     => $claim->amount,
+            // ── Two-stage lifecycle ───────────────────────────────────────────
+            'phase'              => $claim->phase,
+            'claim_expires_at'   => $claim->claim_expires_at?->toISOString(),
+            'payment_starts_at'  => $claim->payment_starts_at?->toISOString(),
+            'payment_expires_at' => $claim->payment_expires_at?->toISOString(),
+            'can_pay'            => $claim->canPay(),
+            // `expires_at` = deadline of the CURRENT phase (claim or payment)
             'expires_at' => $claim->expires_at?->toISOString(),
             'created_at' => $claim->created_at?->toISOString(),
         ];

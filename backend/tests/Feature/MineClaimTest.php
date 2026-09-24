@@ -115,18 +115,80 @@ class MineClaimTest extends TestCase
         $this->claimService->mine($product, $customer);
     }
 
-    /** First Mine creates a pending Order */
-    public function test_mine_creates_pending_order(): void
+    /** First Mine starts a CLAIM stage — no payment opportunity yet */
+    public function test_mine_starts_claim_stage_without_order(): void
     {
         $product  = $this->makeProduct();
         $customer = $this->makeCustomer();
 
         $claim = $this->claimService->mine($product, $customer);
 
-        $this->assertNotNull($claim->order);
-        $this->assertEquals('pending', $claim->order->payment_status);
-        $this->assertEquals($customer->id, $claim->order->user_id);
-        $this->assertEquals(1000, $claim->order->amount);
+        $this->assertEquals('active', $claim->status);
+        $this->assertEquals('claim', $claim->phase);
+        $this->assertNotNull($claim->claim_expires_at);
+        $this->assertNull($claim->payment_starts_at);
+        $this->assertNull($claim->payment_expires_at);
+        // The payment window (and its order) must NOT exist yet
+        $this->assertNull($claim->order);
+
+        // Paying during the claim stage is rejected server-side
+        $this->actingAs($customer, 'sanctum')
+            ->postJson("/api/products/{$product->id}/mine")
+            ->assertStatus(422); // already in the queue
+    }
+
+    /** When the claim stage ends the SAME claimant gets the payment window */
+    public function test_claim_stage_end_opens_payment_window(): void
+    {
+        $product  = $this->makeProduct();
+        $a        = $this->makeCustomer('c1@test.com');
+        $b        = $this->makeCustomer('c2@test.com');
+
+        $claimA = $this->claimService->mine($product, $a);
+        $claimB = $this->claimService->mine($product, $b);
+
+        // End the claim stage of A
+        $this->claimService->expireClaim($claimA);
+
+        $claimA->refresh();
+        $this->assertEquals('active', $claimA->status);
+        $this->assertEquals('payment', $claimA->phase);
+        $this->assertNotNull($claimA->payment_starts_at);
+        $this->assertNotNull($claimA->payment_expires_at);
+        $this->assertEquals('pending', $claimA->order->payment_status);
+
+        // A is still the owner — the queue must NOT have moved to B
+        $this->assertEquals('waiting', $claimB->fresh()->status);
+        $this->assertEquals($a->id, $product->fresh()->activeClaim()?->user_id);
+    }
+
+    /** Paying during the CLAIM stage is refused even with a forged order */
+    public function test_cannot_pay_during_claim_stage(): void
+    {
+        $product  = $this->makeProduct();
+        $a        = $this->makeCustomer('a@test.com');
+
+        $claim = $this->claimService->mine($product, $a);
+
+        // A pending order created by hand (e.g. stale UI / API abuse) is refused
+        $order = \App\Models\Order::create([
+            'order_number'   => '00099',
+            'user_id'        => $a->id,
+            'product_id'     => $product->id,
+            'claim_id'       => $claim->id,
+            'amount'         => 1000,
+            'claim_type'     => 'mine',
+            'payment_status' => 'pending',
+            'status'         => 'pending',
+            'expires_at'     => now()->addMinutes(10),
+        ]);
+
+        $this->actingAs($a, 'sanctum')
+            ->postJson("/api/orders/{$order->id}/pay")
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'CLAIM_PERIOD_ACTIVE');
+
+        $this->assertNotEquals('sold', $product->fresh()->status);
     }
 
     /** Waiting Mine does NOT create an Order (order created only on activation) */
@@ -142,13 +204,17 @@ class MineClaimTest extends TestCase
         $this->assertNull($claim2->order);
     }
 
-    /** Paying active Mine marks product SOLD and claim COMPLETED */
+    /** Paying inside the PAYMENT window marks product SOLD and claim COMPLETED */
     public function test_payment_completes_mine_and_sells_product(): void
     {
         $product  = $this->makeProduct();
         $customer = $this->makeCustomer();
         $claim    = $this->claimService->mine($product, $customer);
-        $order    = $claim->order;
+
+        // Claim stage must finish first (a real timeout does the same thing)
+        $this->claimService->expireClaim($claim);
+        $claim->refresh();
+        $order = $claim->order;
 
         // Simulate payment via the HTTP endpoint
         $response = $this->actingAs($customer, 'sanctum')
@@ -162,8 +228,8 @@ class MineClaimTest extends TestCase
         $this->assertEquals('completed', $claim->fresh()->status);
     }
 
-    /** When active Mine expires, next Mine in queue becomes ACTIVE */
-    public function test_expiration_advances_mine_queue(): void
+    /** Payment expiry (not claim expiry) hands the item to the next in queue */
+    public function test_payment_expiry_advances_mine_queue(): void
     {
         $product   = $this->makeProduct();
         $customer1 = $this->makeCustomer('c1@test.com');
@@ -172,25 +238,37 @@ class MineClaimTest extends TestCase
         $claim1 = $this->claimService->mine($product, $customer1);
         $claim2 = $this->claimService->mine($product, $customer2);
 
-        // Force expire claim1
+        // Stage 1: claim period ends → claimant 1 enters PAYMENT, queue untouched
+        $this->claimService->expireClaim($claim1);
+        $this->assertEquals('active', $claim1->fresh()->status);
+        $this->assertEquals('payment', $claim1->fresh()->phase);
+        $this->assertEquals('waiting', $claim2->fresh()->status);
+
+        // Stage 2: the payment window lapses → claimant 2 takes over
         $this->claimService->expireClaim($claim1);
 
         $this->assertEquals('expired', $claim1->fresh()->status);
         $this->assertEquals('active', $claim2->fresh()->status);
-        $this->assertNotNull($claim2->fresh()->expires_at);
-        // An order should now exist for claim2
-        $this->assertNotNull($claim2->fresh()->order);
+        // Claimant 2 gets a NEW claim stage — not an instant payment window
+        $this->assertEquals('claim', $claim2->fresh()->phase);
+        $this->assertNotNull($claim2->fresh()->claim_expires_at);
+        $this->assertNull($claim2->fresh()->order);
     }
 
-    /** When the last Mine expires, product returns to AVAILABLE */
+    /** When the last claimant's payment lapses, product returns to AVAILABLE */
     public function test_last_mine_expiry_returns_product_to_available(): void
     {
         $product  = $this->makeProduct();
         $customer = $this->makeCustomer();
 
         $claim = $this->claimService->mine($product, $customer);
-        $this->claimService->expireClaim($claim);
 
+        $this->claimService->expireClaim($claim); // claim stage → payment window
+        $this->assertEquals('payment', $claim->fresh()->phase);
+        $this->assertEquals('mine_pending', $product->fresh()->status);
+
+        $this->claimService->expireClaim($claim); // payment window → expired
+        $this->assertEquals('expired', $claim->fresh()->status);
         $this->assertEquals('available', $product->fresh()->status);
     }
 

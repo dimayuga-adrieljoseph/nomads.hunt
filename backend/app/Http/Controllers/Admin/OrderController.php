@@ -4,13 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Services\ClaimService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
 {
+    public function __construct(private readonly ClaimService $claimService) {}
+
     public function index(Request $request): JsonResponse
     {
+        // Reflect expirations before listing so payments are never stale
+        $this->claimService->expireOverdueClaims();
+
         $query = Order::with([
             'user:id,name,email',
             'product:id,name,status',
@@ -83,6 +89,7 @@ class OrderController extends Controller
                 'id'     => $order->claim->id,
                 'type'   => $order->claim->type,
                 'status' => $order->claim->status,
+                'phase'  => $order->claim->phase,
             ] : null;
         }
 

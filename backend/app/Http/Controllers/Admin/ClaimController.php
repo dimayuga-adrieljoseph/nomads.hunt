@@ -18,6 +18,9 @@ class ClaimController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Keep the monitor view honest — release deadlines that already passed
+        $this->claimService->expireOverdueClaims();
+
         $query = Claim::with(['product:id,name,status', 'user:id,name,email']);
 
         if ($type = $request->input('type')) {
@@ -53,6 +56,9 @@ class ClaimController extends Controller
      */
     public function productClaims(Product $product): JsonResponse
     {
+        $this->claimService->expireOverdueClaimsForProduct($product->id);
+        $this->claimService->reconcileProductStatus($product);
+
         $claims = $product->claims()
             ->with(['user:id,name,email', 'order'])
             ->orderBy('type')
@@ -74,21 +80,38 @@ class ClaimController extends Controller
     }
 
     /**
-     * Force-expire the active claim on a product (admin demo tool).
-     * Executes the exact same backend expiration logic as a real timeout.
+     * Force the CURRENT STAGE of an active claim to finish immediately.
+     *
+     * Two-stage lifecycle:
+     *   claim phase   → jumps straight into the payment window for the same user
+     *   payment phase → expires the claim and activates the next queued claimant
+     *
+     * Runs exactly the same backend logic as a real timeout.
      */
     public function forceExpire(Claim $claim): JsonResponse
     {
         if ($claim->status !== Claim::STATUS_ACTIVE) {
             return response()->json([
-                'message' => 'Only active claims can be force-expired.',
+                'message' => 'Only active claims can be advanced.',
             ], 422);
         }
 
+        $stage = $claim->phase;
+
         $this->claimService->expireClaim($claim);
 
+        $claim->refresh();
+
         return response()->json([
-            'message' => 'Claim has been force-expired and the queue has been advanced.',
+            'message' => $stage === Claim::PHASE_CLAIM
+                ? 'Claim period ended — the payment window for this claimant is now open.'
+                : 'Payment window expired — the next queued claimant (if any) is now active.',
+            'claim' => [
+                'id'                 => $claim->id,
+                'status'             => $claim->status,
+                'phase'              => $claim->phase,
+                'payment_expires_at' => $claim->payment_expires_at?->toISOString(),
+            ],
         ]);
     }
 
@@ -104,6 +127,13 @@ class ClaimController extends Controller
             'position'   => $claim->position,
             'status'     => $claim->status,
             'amount'     => $claim->amount,
+            // ── Two-stage lifecycle ───────────────────────────────────────────
+            'phase'              => $claim->phase,
+            'claim_expires_at'   => $claim->claim_expires_at?->toISOString(),
+            'payment_starts_at'  => $claim->payment_starts_at?->toISOString(),
+            'payment_expires_at' => $claim->payment_expires_at?->toISOString(),
+            'can_pay'            => $claim->canPay(),
+            // `expires_at` = deadline of the CURRENT phase (claim or payment)
             'expires_at' => $claim->expires_at?->toISOString(),
             'created_at' => $claim->created_at?->toISOString(),
         ];

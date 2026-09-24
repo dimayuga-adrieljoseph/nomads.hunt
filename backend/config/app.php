@@ -132,6 +132,23 @@ return [
     | it expires and the queue advances. Configurable for demo purposes.
     |
     */
-    'claim_hold_seconds' => (int) env('CLAIM_HOLD_SECONDS', 300),
+    /*
+    |--------------------------------------------------------------------------
+    | Claim Ladder Durations (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | Every ACTIVE claim runs through two separate stages:
+    |
+    |   1. CLAIM   — the claimant holds the item; other customers may Steal it.
+    |   2. PAYMENT — opened only once the claim stage finishes without a Steal;
+    |                the claimant may now pay. If it lapses unpaid, the queue
+    |                advances to the next claimant, who gets a NEW claim stage.
+    |
+    | Both stages are configurable for demo purposes.
+    |
+    */
+
+    'claim_seconds'   => (int) env('CLAIM_HOLD_SECONDS', 60),
+    'payment_seconds' => (int) env('PAYMENT_WINDOW_SECONDS', 60),
 
 ];

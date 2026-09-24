@@ -79,6 +79,46 @@ API calls to `/api/*` are automatically proxied to the Laravel backend via Vite'
 
 ---
 
+## The Claim Ladder (two-stage lifecycle)
+
+MINE and STEAL both run through **two separate stages**. Claim expiration does
+**not** mean the claimant failed — it means they survived the claim period and are
+now allowed to pay:
+
+```
+              claim_expires_at            payment_expires_at
+ CLAIM period ────────────────► PAYMENT window ──────────────► next claimant
+ (holds the piece,               (same claimant may             (brand new
+  others may STEAL)               now pay)                       CLAIM period)
+```
+
+| Stage | Claimant can pay? | What happens at the deadline |
+|---|---|---|
+| `phase = claim` | No | Payment window opens for the **same** claimant |
+| `phase = payment` | Yes | Claim expires → next queued claimant gets a **new claim period** |
+
+* **MINE** — first Mine holds the piece (`claim` phase). Later Mines queue.
+* **STEAL** — overrides the active Mine during its `claim` phase, then runs its own
+  `claim` → `payment` sequence. Mine is locked once a Steal is active.
+* **GRAB** — buy now: skips the claim stage entirely (`grab` → `payment` → `SOLD`).
+* Every queued claimant gets their own claim period; the queue is never skipped and
+  ordering is preserved. The product only returns to `AVAILABLE` when the queue is
+  exhausted.
+
+Configure both stages in `backend/.env`:
+
+```text
+CLAIM_HOLD_SECONDS=60        # CLAIM stage duration
+PAYMENT_WINDOW_SECONDS=60    # PAYMENT window duration
+```
+
+Timers shown in Vue are display-only — Laravel stores `claim_expires_at`,
+`payment_starts_at` and `payment_expires_at` and re-validates on every request
+(`php artisan claims:expire` and the admin **Force Expire** button run the same
+logic, and the API also advances overdue stages lazily so no scheduler is needed).
+
+---
+
 ## Environment
 
 | Variable | Default | Notes |
@@ -89,6 +129,9 @@ API calls to `/api/*` are automatically proxied to the Laravel backend via Vite'
 | `DB_DATABASE` | `nomads_hunt` | Create this in phpMyAdmin |
 | `DB_USERNAME` | `root` | XAMPP default |
 | `DB_PASSWORD` | *(empty)* | XAMPP default — change in production |
+| `CLAIM_HOLD_SECONDS` | `60` | Duration of the claim (hold) stage |
+| `PAYMENT_WINDOW_SECONDS` | `60` | Duration of the payment window |
+| `FRONTEND_URL` | `http://localhost:5173` | Used for CORS |
 
 ---
 

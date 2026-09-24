@@ -87,6 +87,12 @@ class CustomerController extends Controller
                 'status'     => $c->status,
                 'amount'     => $c->amount,
                 'position'   => $c->position,
+                // ── Two-stage lifecycle ───────────────────────────────────────
+                'phase'              => $c->phase,
+                'claim_expires_at'   => $c->claim_expires_at?->toISOString(),
+                'payment_starts_at'  => $c->payment_starts_at?->toISOString(),
+                'payment_expires_at' => $c->payment_expires_at?->toISOString(),
+                'can_pay'            => $c->canPay(),
                 'expires_at' => $c->expires_at?->toISOString(),
                 'created_at' => $c->created_at?->toISOString(),
                 'product'    => $c->product ? [

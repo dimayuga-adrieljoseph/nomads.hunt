@@ -4,17 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+use App\Services\ClaimService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ProductController extends Controller
 {
+    public function __construct(private readonly ClaimService $claimService) {}
+
     /**
      * Public catalog — supports search, filter, pagination.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
+        // Deadlines that already passed must be released before the rack is read
+        $this->claimService->expireOverdueClaims();
+
         $query = Product::query();
 
         // Full-text search across name, brand, category
@@ -53,17 +59,25 @@ class ProductController extends Controller
      */
     public function show(Request $request, Product $product): JsonResponse
     {
+        // Release anything that expired, then make sure the status matches reality
+        $this->claimService->expireOverdueClaimsForProduct($product->id);
+        $this->claimService->reconcileProductStatus($product);
+
         $activeClaim = $product->activeClaim();
 
         $data = (new ProductResource($product))->toArray($request);
 
         // Expose just enough claim context for the UI to render correctly
         $data['active_claim'] = $activeClaim ? [
-            'id'         => $activeClaim->id,
-            'type'       => $activeClaim->type,
-            'user_id'    => $activeClaim->user_id,
-            'status'     => $activeClaim->status,
-            'expires_at' => $activeClaim->expires_at?->toISOString(),
+            'id'                 => $activeClaim->id,
+            'type'               => $activeClaim->type,
+            'user_id'            => $activeClaim->user_id,
+            'status'             => $activeClaim->status,
+            'phase'              => $activeClaim->phase,
+            'claim_expires_at'   => $activeClaim->claim_expires_at?->toISOString(),
+            'payment_starts_at'  => $activeClaim->payment_starts_at?->toISOString(),
+            'payment_expires_at' => $activeClaim->payment_expires_at?->toISOString(),
+            'expires_at'         => $activeClaim->expires_at?->toISOString(),
         ] : null;
 
         // Mine queue count (WAITING mines — shows position context)

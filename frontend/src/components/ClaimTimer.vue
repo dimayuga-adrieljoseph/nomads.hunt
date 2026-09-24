@@ -14,12 +14,18 @@ const emit = defineEmits<{ (e: 'expired'): void }>()
 
 const remaining = ref(0)
 let   timer: ReturnType<typeof setInterval> | null = null
+let   hasEmittedExpired = false
 
 function calc() {
   if (!props.expiresAt) { remaining.value = 0; return }
   const diff = Math.floor((new Date(props.expiresAt).getTime() - Date.now()) / 1000)
   remaining.value = Math.max(0, diff)
-  if (remaining.value === 0) emit('expired')
+  // Emit once only — otherwise every tick after zero would re-trigger the
+  // parent's refresh and hammer the API.
+  if (remaining.value === 0 && !hasEmittedExpired) {
+    hasEmittedExpired = true
+    emit('expired')
+  }
 }
 
 const display = computed(() => {
@@ -32,6 +38,7 @@ const display = computed(() => {
 const isUrgent = computed(() => remaining.value > 0 && remaining.value <= 60)
 
 function start() {
+  hasEmittedExpired = false
   calc()
   timer = setInterval(calc, 1000)
 }

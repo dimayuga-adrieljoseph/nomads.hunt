@@ -8,6 +8,11 @@ const router = createRouter({
     // ── Public ──────────────────────────────────────────────────────────────
     {
       path: '/',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
+    },
+    {
+      path: '/catalog',
       name: 'catalog',
       component: () => import('@/views/CatalogView.vue'),
     },
@@ -140,7 +145,7 @@ router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
 
   if (to.meta.guestOnly && auth.isLoggedIn) {
-    return next(auth.isAdmin ? '/admin' : '/')
+    return next(auth.isAdmin ? '/admin' : '/catalog')
   }
 
   if (to.meta.requiresAuth && !auth.isLoggedIn) {

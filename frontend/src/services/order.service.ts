@@ -11,7 +11,7 @@ export interface Order {
   expires_at: string | null
   created_at: string
   product?: { id: number; name: string; image_url: string | null; status: string } | null
-  claim?: { id: number; type: string; status: string } | null
+  claim?: { id: number; type: string; status: string; phase: 'claim' | 'payment' | null } | null
   user?: { id: number; name: string; email: string } | null
 }
 

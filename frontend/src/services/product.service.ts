@@ -26,6 +26,12 @@ export interface ActiveClaim {
   type: 'mine' | 'steal' | 'grab'
   user_id: number
   status: string
+  /** 'claim' = holding the piece (others may Steal) | 'payment' = window open */
+  phase: 'claim' | 'payment' | null
+  claim_expires_at: string | null
+  payment_starts_at: string | null
+  payment_expires_at: string | null
+  /** Deadline of the CURRENT phase (claim or payment) */
   expires_at: string | null
 }
 
@@ -114,6 +120,14 @@ export interface ClaimRecord {
   position: number
   status: 'waiting' | 'active' | 'expired' | 'completed' | 'overridden' | 'cancelled'
   amount: number
+  /** 'claim' = holding the piece (others may Steal) | 'payment' = window open */
+  phase: 'claim' | 'payment' | null
+  claim_expires_at: string | null
+  payment_starts_at: string | null
+  payment_expires_at: string | null
+  /** Server-side truth: payment is open right now */
+  can_pay: boolean
+  /** Deadline of the CURRENT phase (claim or payment) */
   expires_at: string | null
   created_at: string
   product?: { id: number; name: string; image_url: string | null; status: string } | null
