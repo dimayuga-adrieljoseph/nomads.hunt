@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
@@ -60,6 +61,16 @@ class Product extends Model
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(ProductLike::class);
+    }
+
+    public function likedBy(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'product_likes')->withTimestamps();
     }
 
     // ── Scoped queries ────────────────────────────────────────────────────────

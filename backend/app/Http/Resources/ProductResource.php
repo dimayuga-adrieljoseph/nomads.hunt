@@ -24,6 +24,7 @@ class ProductResource extends JsonResource
             'steal_price' => $this->steal_price,
             'grab_price'  => $this->grab_price,
             'status'      => $this->status,
+            'is_liked'    => (bool) ($this->is_liked ?? false),
             'created_at'  => $this->created_at?->toISOString(),
             'updated_at'  => $this->updated_at?->toISOString(),
         ];

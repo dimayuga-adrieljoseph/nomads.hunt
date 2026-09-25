@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import ProductLikeButton from '@/components/ProductLikeButton.vue'
 import type { Product } from '@/services/product.service'
 import { formatPeso, productStatusLabel, productStatusClass, conditionLabel } from '@/utils/formatters'
 
@@ -15,17 +16,23 @@ const deg  = props.rotation ?? 0
 
 <template>
   <!-- ── RACK ITEM ──────────────────────────────────────────────────────── -->
-  <RouterLink
+  <article
     v-if="mode === 'rack'"
-    :to="`/products/${product.id}`"
     class="rack-item"
     :class="{
       'rack-item--sold':      product.status === 'sold',
       'rack-item--claimed':   product.status === 'mine_pending' || product.status === 'steal_pending',
     }"
     :style="`--item-rot: ${deg}deg`"
-    :aria-label="`${product.name}${product.brand ? ' by ' + product.brand : ''} — ${formatPeso(product.mine_price)}`"
   >
+    <RouterLink
+      :to="`/products/${product.id}`"
+      class="product-card__link"
+      :aria-label="`View ${product.name}${product.brand ? ' by ' + product.brand : ''} — ${formatPeso(product.mine_price)}`"
+    >
+      <span class="product-card__sr-only">View product</span>
+    </RouterLink>
+    <ProductLikeButton :product="product" />
     <!-- Status dot -->
     <span
       :class="['rack-item__dot', productStatusClass(product.status)]"
@@ -79,16 +86,18 @@ const deg  = props.rotation ?? 0
       <span class="rack-item__hover-steal">STEAL {{ formatPeso(product.steal_price) }}</span>
       <span class="rack-item__hover-grab">GRAB {{ formatPeso(product.grab_price) }}</span>
     </div>
-  </RouterLink>
+  </article>
 
   <!-- ── GRID CARD ──────────────────────────────────────────────────────── -->
-  <RouterLink
-    v-else
-    :to="`/products/${product.id}`"
-    class="grid-card"
-    :class="{ 'grid-card--sold': product.status === 'sold' }"
-    :aria-label="`${product.name}${product.brand ? ' by ' + product.brand : ''} — ${formatPeso(product.mine_price)}`"
-  >
+  <article v-else class="grid-card" :class="{ 'grid-card--sold': product.status === 'sold' }">
+    <RouterLink
+      :to="`/products/${product.id}`"
+      class="product-card__link"
+      :aria-label="`View ${product.name}${product.brand ? ' by ' + product.brand : ''} — ${formatPeso(product.mine_price)}`"
+    >
+      <span class="product-card__sr-only">View product</span>
+    </RouterLink>
+    <ProductLikeButton :product="product" />
     <!-- Image -->
     <div class="grid-card__img-wrap">
       <img
@@ -129,10 +138,32 @@ const deg  = props.rotation ?? 0
         </div>
       </div>
     </div>
-  </RouterLink>
+  </article>
 </template>
 
 <style scoped>
+.product-card__link {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+}
+.product-card__link:focus-visible {
+  outline: 2px solid var(--color-spice-market);
+  outline-offset: 2px;
+}
+.product-card__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    RACK ITEM
    ═══════════════════════════════════════════════════════════════ */
@@ -153,11 +184,6 @@ const deg  = props.rotation ?? 0
 
 .rack-item:hover {
   transform: rotate(0deg) translateY(-16px) scale(1.02);
-  z-index: 20;
-}
-.rack-item:focus-visible {
-  outline: 2px solid var(--color-spice-market);
-  outline-offset: 2px;
   z-index: 20;
 }
 
@@ -323,7 +349,7 @@ const deg  = props.rotation ?? 0
 /* Hover reveal panel (shown on hover) */
 .rack-item__hover-panel {
   position: absolute;
-  top: .875rem;
+  top: 3.5rem;
   right: .875rem;
   z-index: 5;
   display: flex;
@@ -367,6 +393,7 @@ const deg  = props.rotation ?? 0
    GRID CARD
    ═══════════════════════════════════════════════════════════════ */
 .grid-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--color-balsamico);
@@ -376,7 +403,6 @@ const deg  = props.rotation ?? 0
   overflow: hidden;
 }
 .grid-card:hover { border-color: var(--color-spice-border); background: var(--color-balsamico-light); }
-.grid-card:focus-visible { outline: 2px solid var(--color-spice-market); outline-offset: 0; }
 
 .grid-card--sold { opacity: .7; }
 
@@ -403,7 +429,7 @@ const deg  = props.rotation ?? 0
 
 .grid-card__badge {
   position: absolute;
-  top: .75rem; right: .75rem;
+  top: .75rem; left: .75rem;
 }
 
 .grid-card__body {

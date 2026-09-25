@@ -36,10 +36,14 @@ const router = createRouter({
 
     // ── Customer (auth required) ─────────────────────────────────────────────
     {
-      path: '/my-claims',
-      name: 'my-claims',
-      component: () => import('@/views/MyClaimsView.vue'),
+      path: '/liked-products',
+      name: 'liked-products',
+      component: () => import('@/views/LikedProductsView.vue'),
       meta: { requiresAuth: true, requiresCustomer: true },
+    },
+    {
+      path: '/my-claims',
+      redirect: { name: 'liked-products' },
     },
     {
       path: '/my-orders',
@@ -97,6 +101,21 @@ const router = createRouter({
           path: 'products/:id/edit',
           name: 'admin-product-edit',
           component: () => import('@/views/admin/ProductFormView.vue'),
+        },
+        {
+          path: 'announcements',
+          name: 'admin-announcements',
+          component: () => import('@/views/admin/AnnouncementsView.vue'),
+        },
+        {
+          path: 'announcements/new',
+          name: 'admin-announcement-new',
+          component: () => import('@/views/admin/AnnouncementFormView.vue'),
+        },
+        {
+          path: 'announcements/:id/edit',
+          name: 'admin-announcement-edit',
+          component: () => import('@/views/admin/AnnouncementFormView.vue'),
         },
         {
           path: 'claims',

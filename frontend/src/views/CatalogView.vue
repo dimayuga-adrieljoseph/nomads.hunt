@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import ProductCard from '@/components/ProductCard.vue'
 import { productService, type Product, type FilterOptions } from '@/services/product.service'
+import { useLikeStore } from '@/stores/likes'
 
 // ── State ────────────────────────────────────────────────────────────────────
 const products    = ref<Product[]>([])
@@ -11,6 +11,7 @@ const loading     = ref(false)
 const currentPage = ref(1)
 const lastPage    = ref(1)
 const total       = ref(0)
+const likes       = useLikeStore()
 
 // ── Multi-select filter arrays ───────────────────────────────────────────────
 const filters = reactive({
@@ -56,7 +57,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 // ── Multi-select toggle helpers ───────────────────────────────────────────────
 function toggleArr(arr: string[], val: string) {
   const idx = arr.indexOf(val)
-  idx === -1 ? arr.push(val) : arr.splice(idx, 1)
+  if (idx === -1) arr.push(val)
+  else arr.splice(idx, 1)
 }
 
 // ── Computed: active filter counts ───────────────────────────────────────────
@@ -89,6 +91,7 @@ async function loadProducts(page = 1) {
       status:    (filters.statuses.length   ? filters.statuses.join(',')   : undefined),
       page,
     })
+    likes.sync(res.data)
     products.value    = res.data
     currentPage.value = res.meta.current_page
     lastPage.value    = res.meta.last_page

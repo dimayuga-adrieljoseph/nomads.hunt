@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService, type AuthUser } from '@/services/auth.service'
+import { useLikeStore } from '@/stores/likes'
 
 export const useAuthStore = defineStore('auth', () => {
   // ── State ─────────────────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   const token = ref<string | null>(localStorage.getItem('auth_token'))
+  const likes = useLikeStore()
 
   // ── Computed ──────────────────────────────────────────────────────────────
 
@@ -27,6 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Actions ───────────────────────────────────────────────────────────────
 
   function setAuth(authUser: AuthUser, authToken: string) {
+    likes.reset()
     user.value  = authUser
     token.value = authToken
     localStorage.setItem('auth_user',  JSON.stringify(authUser))
@@ -34,6 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clearAuth() {
+    likes.reset()
     user.value  = null
     token.value = null
     localStorage.removeItem('auth_user')
