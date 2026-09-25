@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Route;
 // ── Health ────────────────────────────────────────────────────────────────────
 
 Route::get('/health', fn () => response()->json([
-    'status'  => 'ok',
+    'status' => 'ok',
     'message' => 'NomadsHunt API is running.',
 ]));
 
@@ -21,14 +21,14 @@ Route::get('/health', fn () => response()->json([
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login',    [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login']);
 });
 
 // ── Public catalog ────────────────────────────────────────────────────────────
 
 Route::get('/products/filter-options', [ProductController::class, 'filterOptions']);
-Route::get('/products',                [ProductController::class, 'index']);
-Route::get('/products/{product}',      [ProductController::class, 'show']);
+Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/{product}', [ProductController::class, 'show']);
 
 // Public claim history for a product (used on product detail page)
 Route::get('/products/{product}/claims', [ClaimController::class, 'productClaims']);
@@ -44,22 +44,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/me',      [AuthController::class, 'me']);
+    Route::get('/auth/me', [AuthController::class, 'me']);
 
     // Claim actions (customers only)
     Route::middleware('customer')->group(function () {
-        Route::post('/products/{product}/mine',  [ClaimController::class, 'mine']);
+        Route::post('/products/{product}/mine', [ClaimController::class, 'mine']);
         Route::post('/products/{product}/steal', [ClaimController::class, 'steal']);
-        Route::post('/products/{product}/grab',  [ClaimController::class, 'grab']);
+        Route::post('/products/{product}/grab', [ClaimController::class, 'grab']);
 
-        Route::get('/my-claims',            [ClaimController::class, 'myClaims']);
-        Route::get('/my-orders',            [OrderController::class, 'myOrders']);
+        Route::get('/my-claims', [ClaimController::class, 'myClaims']);
+        Route::get('/my-orders', [OrderController::class, 'myOrders']);
 
-        Route::get('/likes',                         [ProductLikeController::class, 'index']);
-        Route::post('/products/{product}/like',      [ProductLikeController::class, 'store']);
-        Route::delete('/products/{product}/like',   [ProductLikeController::class, 'destroy']);
-        Route::get('/orders/{order}',       [OrderController::class, 'show']);
-        Route::post('/orders/{order}/pay',  [OrderController::class, 'pay']);
+        Route::get('/likes', [ProductLikeController::class, 'index']);
+        Route::post('/products/{product}/like', [ProductLikeController::class, 'store']);
+        Route::delete('/products/{product}/like', [ProductLikeController::class, 'destroy']);
+        Route::get('/orders/{order}', [OrderController::class, 'show']);
+        Route::post('/orders/{order}/pay', [OrderController::class, 'pay']);
     });
 
     // ── Admin routes ──────────────────────────────────────────────────────────
@@ -80,23 +80,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/announcements/{announcement}/archive', [AdminAnnouncementController::class, 'archive']);
 
         // Products
-        Route::get('/products',                           [Admin\ProductController::class, 'index']);
-        Route::post('/products',                          [Admin\ProductController::class, 'store']);
-        Route::get('/products/{product}',                 [Admin\ProductController::class, 'show']);
-        Route::put('/products/{product}',                 [Admin\ProductController::class, 'update']);
-        Route::post('/products/{product}/upload-image',   [Admin\ProductController::class, 'uploadImage']);
+        Route::get('/products', [Admin\ProductController::class, 'index']);
+        Route::post('/products', [Admin\ProductController::class, 'store']);
+        Route::get('/products/{product}', [Admin\ProductController::class, 'show']);
+        Route::put('/products/{product}', [Admin\ProductController::class, 'update']);
+        Route::post('/products/{product}/upload-image', [Admin\ProductController::class, 'uploadImage']);
+        Route::delete('/products/{product}/images/{image}', [Admin\ProductController::class, 'destroyImage']);
 
         // Claims
-        Route::get('/claims',                                [Admin\ClaimController::class, 'index']);
-        Route::get('/products/{product}/claims',             [Admin\ClaimController::class, 'productClaims']);
-        Route::post('/claims/{claim}/force-expire',          [Admin\ClaimController::class, 'forceExpire']);
+        Route::get('/claims', [Admin\ClaimController::class, 'index']);
+        Route::get('/products/{product}/claims', [Admin\ClaimController::class, 'productClaims']);
+        Route::post('/claims/{claim}/force-expire', [Admin\ClaimController::class, 'forceExpire']);
 
         // Orders
-        Route::get('/orders',           [Admin\OrderController::class, 'index']);
-        Route::get('/orders/{order}',   [Admin\OrderController::class, 'show']);
+        Route::get('/orders', [Admin\OrderController::class, 'index']);
+        Route::get('/orders/{order}', [Admin\OrderController::class, 'show']);
 
         // Customers
-        Route::get('/customers',        [Admin\CustomerController::class, 'index']);
+        Route::get('/customers', [Admin\CustomerController::class, 'index']);
         Route::get('/customers/{user}', [Admin\CustomerController::class, 'show']);
 
         // Activity logs

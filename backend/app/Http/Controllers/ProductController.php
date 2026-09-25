@@ -21,14 +21,14 @@ class ProductController extends Controller
         // Deadlines that already passed must be released before the rack is read
         $this->claimService->expireOverdueClaims();
 
-        $query = Product::query();
+        $query = Product::query()->with('primaryImage');
 
         // Full-text search across name, brand, category
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('brand', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%");
+                    ->orWhere('brand', 'like', "%{$search}%")
+                    ->orWhere('category', 'like', "%{$search}%");
             });
         }
 
@@ -70,6 +70,7 @@ class ProductController extends Controller
         // Release anything that expired, then make sure the status matches reality
         $this->claimService->expireOverdueClaimsForProduct($product->id);
         $this->claimService->reconcileProductStatus($product);
+        $product->load('images');
 
         if ($user = $request->user('sanctum')) {
             $product->loadExists([
@@ -83,19 +84,19 @@ class ProductController extends Controller
 
         // Expose just enough claim context for the UI to render correctly
         $data['active_claim'] = $activeClaim ? [
-            'id'                 => $activeClaim->id,
-            'type'               => $activeClaim->type,
-            'user_id'            => $activeClaim->user_id,
-            'status'             => $activeClaim->status,
-            'phase'              => $activeClaim->phase,
-            'claim_expires_at'   => $activeClaim->claim_expires_at?->toISOString(),
-            'payment_starts_at'  => $activeClaim->payment_starts_at?->toISOString(),
+            'id' => $activeClaim->id,
+            'type' => $activeClaim->type,
+            'user_id' => $activeClaim->user_id,
+            'status' => $activeClaim->status,
+            'phase' => $activeClaim->phase,
+            'claim_expires_at' => $activeClaim->claim_expires_at?->toISOString(),
+            'payment_starts_at' => $activeClaim->payment_starts_at?->toISOString(),
             'payment_expires_at' => $activeClaim->payment_expires_at?->toISOString(),
-            'expires_at'         => $activeClaim->expires_at?->toISOString(),
+            'expires_at' => $activeClaim->expires_at?->toISOString(),
         ] : null;
 
         // Mine queue count (WAITING mines — shows position context)
-        $data['mine_queue_count']  = $product->claims()
+        $data['mine_queue_count'] = $product->claims()
             ->where('type', 'mine')
             ->whereIn('status', ['active', 'waiting'])
             ->count();
@@ -115,9 +116,9 @@ class ProductController extends Controller
     {
         return response()->json([
             'categories' => Product::distinct()->whereNotNull('category')->pluck('category')->sort()->values(),
-            'sizes'      => Product::distinct()->whereNotNull('size')->pluck('size')->sort()->values(),
+            'sizes' => Product::distinct()->whereNotNull('size')->pluck('size')->sort()->values(),
             'conditions' => ['excellent', 'good', 'fair', 'poor'],
-            'statuses'   => ['available', 'mine_pending', 'steal_pending', 'grab_pending', 'sold'],
+            'statuses' => ['available', 'mine_pending', 'steal_pending', 'grab_pending', 'sold'],
         ]);
     }
 }

@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { productService, type Product } from '@/services/product.service'
+import { productService, type Product, type ProductImage } from '@/services/product.service'
 import { claimService, type ClaimRecord } from '@/services/claim.service'
 import ClaimLadder from '@/components/ClaimLadder.vue'
 import ProductLikeButton from '@/components/ProductLikeButton.vue'
@@ -18,17 +18,19 @@ const loading = ref(true)
 const loadError = ref('')
 
 // ── Gallery state ────────────────────────────────────────────────────────────
-// Currently only one image per product; this is wired to support more when the
-// backend returns an images array. For now images = [image_url] if set.
-const activeImage  = ref<string | null>(null)
-const galleryImages = computed<string[]>(() => {
-  if (!product.value) return []
-  const imgs: string[] = []
-  if (product.value.image_url) imgs.push(product.value.image_url)
-  return imgs
-})
+const activeImageId = ref<number | null>(null)
+const mainImageLoading = ref(false)
+const mainImageFailed = ref(false)
+const galleryImages = computed<ProductImage[]>(() => product.value?.images ?? [])
+const activeImage = computed(() =>
+  galleryImages.value.find((image) => image.id === activeImageId.value) ?? galleryImages.value[0] ?? null,
+)
 
-function selectImage(url: string) { activeImage.value = url }
+function selectImage(image: ProductImage) {
+  mainImageFailed.value = false
+  mainImageLoading.value = true
+  activeImageId.value = image.id
+}
 
 // ── Claim state ──────────────────────────────────────────────────────────────
 // myActiveClaim is sourced from the user's own /my-claims response so it
@@ -62,7 +64,9 @@ async function load() {
     likes.sync([p])
     product.value     = p
     claims.value      = c
-    activeImage.value = p.image_url ?? null
+    activeImageId.value = p.images?.find((image) => image.is_primary)?.id ?? p.images?.[0]?.id ?? null
+    mainImageFailed.value = false
+    mainImageLoading.value = (p.images?.length ?? 0) > 0
 
     // Pick the user's active or waiting claim for this product from myClaims,
     // which includes the order relationship required for the Pay button.
@@ -135,15 +139,15 @@ function toggleHistory(e: MouseEvent) {
             aria-label="Product images"
           >
             <button
-              v-for="(img, i) in galleryImages"
-              :key="i"
-              :class="['detail__thumb', { 'detail__thumb--active': activeImage === img }]"
+              v-for="(image, i) in galleryImages"
+              :key="image.id"
+              :class="['detail__thumb', { 'detail__thumb--active': activeImage?.id === image.id }]"
               :aria-label="`View image ${i + 1}`"
-              :aria-pressed="activeImage === img"
+              :aria-pressed="activeImage?.id === image.id"
               role="listitem"
-              @click="selectImage(img)"
+              @click="selectImage(image)"
             >
-              <img :src="img" :alt="`${product.name} image ${i + 1}`" loading="lazy" />
+              <img :src="image.url" :alt="`${product.name} image ${i + 1}`" loading="lazy" />
             </button>
           </div>
 
@@ -153,13 +157,24 @@ function toggleHistory(e: MouseEvent) {
             :class="{ 'detail__main-img-wrap--unavailable': isUnavailable }"
           >
             <img
-              v-if="activeImage"
-              :src="activeImage"
-              :alt="product.name"
+              v-if="activeImage && !mainImageFailed"
+              :key="activeImage.id"
+              :src="activeImage.url"
+              :alt="`${product.name} — ${activeImage.is_primary ? 'main image' : 'gallery image'}`"
               class="detail__main-img"
+              :class="{ 'detail__main-img--loading': mainImageLoading }"
+              @load="mainImageLoading = false"
+              @error="mainImageLoading = false; mainImageFailed = true"
             />
+            <div v-else-if="mainImageFailed" class="detail__main-img-placeholder">
+              <span>IMAGE UNAVAILABLE</span>
+            </div>
             <div v-else class="detail__main-img-placeholder">
               <span>NO IMAGE</span>
+            </div>
+            <div v-if="mainImageLoading" class="detail__image-loading" role="status">
+              <span class="spinner" aria-hidden="true" />
+              <span>Loading image…</span>
             </div>
 
             <!-- Status badge overlay -->
@@ -376,7 +391,24 @@ function toggleHistory(e: MouseEvent) {
   object-fit: cover;
   display: block;
   aspect-ratio: 3/4;
+  transition: opacity var(--transition-fast);
 }
+.detail__main-img--loading { opacity: 0; }
+.detail__image-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  background: var(--color-balsamico-lighter);
+  color: var(--color-seashell-muted);
+  font-size: .68rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.detail__image-loading .spinner { width: 24px; height: 24px; }
 .detail__main-img-placeholder {
   width: 100%;
   aspect-ratio: 3/4;

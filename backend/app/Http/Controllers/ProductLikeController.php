@@ -17,6 +17,7 @@ class ProductLikeController extends Controller
         $products = $request->user()
             ->likedProducts()
             ->latest('product_likes.created_at')
+            ->with('primaryImage')
             ->get()
             ->each(fn (Product $product) => $product->setAttribute('is_liked', true));
 
@@ -31,6 +32,7 @@ class ProductLikeController extends Controller
             'product_id' => $product->id,
         ]);
 
+        $product->load('primaryImage');
         $product->setAttribute('is_liked', true);
 
         return response()->json([
@@ -46,6 +48,7 @@ class ProductLikeController extends Controller
             ->where('product_id', $product->id)
             ->delete();
 
+        $product->load('primaryImage');
         $product->setAttribute('is_liked', false);
 
         return response()->json([

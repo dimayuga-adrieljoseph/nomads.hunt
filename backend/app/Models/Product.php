@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'name', 'description', 'category', 'brand', 'size', 'condition',
+    // Transitional rollback mirror; product_images is the runtime source of truth.
     'image', 'mine_price', 'steal_price', 'grab_price', 'status',
 ])]
 class Product extends Model
@@ -18,11 +20,15 @@ class Product extends Model
 
     // ── Status constants ──────────────────────────────────────────────────────
 
-    const STATUS_AVAILABLE     = 'available';
-    const STATUS_MINE_PENDING  = 'mine_pending';
+    const STATUS_AVAILABLE = 'available';
+
+    const STATUS_MINE_PENDING = 'mine_pending';
+
     const STATUS_STEAL_PENDING = 'steal_pending';
-    const STATUS_GRAB_PENDING  = 'grab_pending';
-    const STATUS_SOLD          = 'sold';
+
+    const STATUS_GRAB_PENDING = 'grab_pending';
+
+    const STATUS_SOLD = 'sold';
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -68,9 +74,36 @@ class Product extends Model
         return $this->hasMany(ProductLike::class);
     }
 
+    public function images(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function primaryImage(): HasOne
+    {
+        return $this->hasOne(ProductImage::class)
+            ->where('is_primary', true)
+            ->orderByDesc('sort_order')
+            ->orderByDesc('id');
+    }
+
     public function likedBy(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'product_likes')->withTimestamps();
+    }
+
+    public function primaryImageUrl(): ?string
+    {
+        $image = match (true) {
+            $this->relationLoaded('primaryImage') => $this->primaryImage,
+            $this->relationLoaded('images') => $this->images
+                ->firstWhere('is_primary', true) ?? $this->images->first(),
+            default => $this->primaryImage,
+        };
+
+        return $image?->url;
     }
 
     // ── Scoped queries ────────────────────────────────────────────────────────

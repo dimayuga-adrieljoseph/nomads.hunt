@@ -1,5 +1,12 @@
 import api from './api'
 
+export interface ProductImage {
+  id: number
+  url: string
+  is_primary: boolean
+  sort_order: number
+}
+
 export interface Product {
   id: number
   name: string
@@ -8,7 +15,10 @@ export interface Product {
   brand: string | null
   size: string | null
   condition: 'excellent' | 'good' | 'fair' | 'poor'
+  /** Primary image URL for list/card consumers. */
   image_url: string | null
+  /** Full ordered gallery; returned by product detail and admin edit endpoints. */
+  images?: ProductImage[]
   mine_price: number
   steal_price: number
   grab_price: number
@@ -58,6 +68,28 @@ export interface PaginatedProducts {
   links: unknown
 }
 
+// Let the browser set the multipart boundary; Axios will encode FormData safely.
+const multipartConfig = { headers: { Accept: 'application/json' } }
+
+function toProductFormData(
+  payload: Partial<Product>,
+  files: File[],
+  order: string[],
+  primaryImage: string | null,
+  syncImages = true,
+): FormData {
+  const form = new FormData()
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) form.append(key, String(value))
+  })
+  files.forEach((file) => form.append('images[]', file))
+  order.forEach((descriptor) => form.append('image_order[]', descriptor))
+  if (primaryImage) form.append('primary_image', primaryImage)
+  if (syncImages) form.append('sync_images', '1')
+  if (syncImages && files.length === 0 && order.length === 0) form.append('clear_images', '1')
+  return form
+}
+
 export const productService = {
   async list(filters: ProductFilters = {}) {
     const { data } = await api.get('/products', { params: filters })
@@ -91,23 +123,40 @@ export const productService = {
     return data.data as Product
   },
 
-  async adminCreate(payload: Partial<Product>) {
-    const { data } = await api.post('/admin/products', payload)
+  async adminCreate(
+    payload: Partial<Product>,
+    files: File[] = [],
+    order: string[] = [],
+    primaryImage: string | null = null,
+  ) {
+    const form = toProductFormData(payload, files, order, primaryImage)
+    const { data } = await api.post('/admin/products', form, multipartConfig)
     return data.data as Product
   },
 
-  async adminUpdate(id: number, payload: Partial<Product>) {
-    const { data } = await api.put(`/admin/products/${id}`, payload)
+  async adminUpdate(
+    id: number,
+    payload: Partial<Product>,
+    files: File[] = [],
+    order: string[] = [],
+    primaryImage: string | null = null,
+    syncImages = false,
+  ) {
+    const form = toProductFormData(payload, files, order, primaryImage, syncImages)
+    const { data } = await api.put(`/admin/products/${id}`, form, multipartConfig)
     return data.data as Product
   },
 
   async adminUploadImage(id: number, file: File) {
     const form = new FormData()
     form.append('image', file)
-    const { data } = await api.post(`/admin/products/${id}/upload-image`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const { data } = await api.post(`/admin/products/${id}/upload-image`, form, multipartConfig)
     return data
+  },
+
+  async adminDeleteImage(productId: number, imageId: number) {
+    const { data } = await api.delete(`/admin/products/${productId}/images/${imageId}`)
+    return data.data as Product
   },
 }
 
