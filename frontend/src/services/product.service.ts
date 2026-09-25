@@ -13,6 +13,7 @@ export interface Product {
   steal_price: number
   grab_price: number
   status: 'available' | 'mine_pending' | 'steal_pending' | 'grab_pending' | 'sold'
+  is_liked: boolean
   created_at: string
   updated_at: string
   // extras from show endpoint

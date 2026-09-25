@@ -5,10 +5,13 @@ import { useAuthStore } from '@/stores/auth'
 import { productService, type Product } from '@/services/product.service'
 import { claimService, type ClaimRecord } from '@/services/claim.service'
 import ClaimLadder from '@/components/ClaimLadder.vue'
+import ProductLikeButton from '@/components/ProductLikeButton.vue'
+import { useLikeStore } from '@/stores/likes'
 import { productStatusLabel, productStatusClass, conditionLabel, formatDate } from '@/utils/formatters'
 
 const route   = useRoute()
 const auth    = useAuthStore()
+const likes   = useLikeStore()
 const product = ref<Product | null>(null)
 const claims  = ref<ClaimRecord[]>([])
 const loading = ref(true)
@@ -56,6 +59,7 @@ async function load() {
       auth.isCustomer ? claimService.myClaims() : Promise.resolve(null),
     ]
     const [p, c, mine] = await Promise.all(requests)
+    likes.sync([p])
     product.value     = p
     claims.value      = c
     activeImage.value = p.image_url ?? null
@@ -216,6 +220,11 @@ function toggleHistory(e: MouseEvent) {
           </div>
 
           <div class="detail__divider" />
+
+          <div class="detail__save-row">
+            <span>Keep an eye on this piece</span>
+            <ProductLikeButton :product="product" variant="detail" />
+          </div>
 
           <!-- ── Claim Ladder ─────────────────────────────────────────── -->
           <ClaimLadder
@@ -484,6 +493,17 @@ function toggleHistory(e: MouseEvent) {
   border: none;
   border-top: 1px solid var(--color-balsamico-border);
   margin: .25rem 0;
+}
+.detail__save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-seashell-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
 }
 
 /* ── Queues ────────────────────────────────────────────────────────────────── */

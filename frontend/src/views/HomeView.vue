@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
+import { announcementService, type PublicAnnouncement } from '@/services/announcement.service'
 import { productService, type Product } from '@/services/product.service'
 import { formatPeso, productStatusClass } from '@/utils/formatters'
+
+// ── Homepage announcement ─────────────────────────────────────────────────────
+const activeAnnouncement = ref<PublicAnnouncement | null>(null)
 
 // ── Featured products ────────────────────────────────────────────────────────
 const featured  = ref<Product[]>([])
 const featLoading = ref(true)
 
 onMounted(async () => {
+  // Announcement failures must not prevent the rest of the homepage from loading.
+  void announcementService
+    .active()
+    .then((announcement) => { activeAnnouncement.value = announcement })
+    .catch(() => { activeAnnouncement.value = null })
+
   try {
     const res = await productService.list({ page: 1 })
     // Show first 6 products as featured
@@ -74,19 +85,8 @@ function getRot(i: number) { return rotations[i % rotations.length] }
     </div>
   </section>
 
-  <!-- ── NEXT FIELD ANNOUNCEMENT ────────────────────────────────────────── -->
-  <section class="announcement" aria-label="Upcoming event">
-    <div class="announcement__inner container">
-      <div class="announcement__left">
-        <span class="announcement__label display">NEXT FIELD</span>
-        <span class="announcement__event">September 26–27 &nbsp;|&nbsp; 11AM–9PM &nbsp;|&nbsp; G Studios, Alabang</span>
-      </div>
-      <div class="announcement__right">
-        <span class="announcement__heading display">Alabang Booth</span>
-      </div>
-    </div>
-    <div class="announcement__bg-rack" aria-hidden="true" />
-  </section>
+  <!-- ── DYNAMIC ANNOUNCEMENT ────────────────────────────────────────────── -->
+  <AnnouncementBanner :announcement="activeAnnouncement" />
 
   <!-- ── IN THE WILD ─────────────────────────────────────────────────────── -->
   <section class="wild" aria-labelledby="wild-heading">
@@ -444,65 +444,6 @@ function getRot(i: number) { return rotations[i % rotations.length] }
   color: rgba(254,243,238,.25);
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-}
-
-/* ── ANNOUNCEMENT ─────────────────────────────────────────────────────────── */
-.announcement {
-  position: relative;
-  height: 140px;
-  overflow: hidden;
-  border-top: 1px solid var(--color-balsamico-border);
-  border-bottom: 1px solid var(--color-balsamico-border);
-}
-
-.announcement__bg-rack {
-  position: absolute;
-  inset: 0;
-  background: url('https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=1400&q=60&auto=format&fit=crop')
-    center center / cover no-repeat;
-  opacity: .18;
-}
-
-.announcement__inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 100%;
-  gap: 2rem;
-}
-
-.announcement__left {
-  display: flex;
-  flex-direction: column;
-  gap: .5rem;
-}
-
-.announcement__label {
-  font-size: 1.1rem;
-  letter-spacing: .12em;
-  color: var(--color-seashell);
-  background: var(--color-spice-market);
-  padding: .2rem .75rem;
-  display: inline-block;
-  line-height: 1.4;
-}
-
-.announcement__event {
-  font-size: .8rem;
-  font-weight: 600;
-  letter-spacing: .08em;
-  color: var(--color-seashell-muted);
-  text-transform: uppercase;
-}
-
-.announcement__right {}
-.announcement__heading {
-  font-size: clamp(1.8rem, 4vw, 3rem);
-  color: var(--color-spice-market);
-  letter-spacing: .04em;
-  white-space: nowrap;
 }
 
 /* ── IN THE WILD ───────────────────────────────────────────────────────────── */
@@ -985,10 +926,6 @@ function getRot(i: number) { return rotations[i % rotations.length] }
   .hero__content { flex-direction: column; align-items: flex-start; }
   .hero__deco    { display: none; }
   .hero__headline { font-size: clamp(3rem, 14vw, 4.5rem); }
-
-  .announcement { height: auto; padding: 1.5rem 0; }
-  .announcement__inner { flex-direction: column; align-items: flex-start; gap: 1rem; }
-  .announcement__heading { font-size: 1.8rem; }
 
   .wild__rack { padding: 0 1rem 1.5rem; }
   .wild__item { width: 180px; height: 300px; }

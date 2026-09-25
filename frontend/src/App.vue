@@ -43,7 +43,7 @@ function closeMobile() { mobileOpen.value = false }
       <div class="nav__actions">
         <!-- Customer icons -->
         <template v-if="auth.isLoggedIn && auth.isCustomer">
-          <RouterLink to="/my-claims" class="nav__icon-btn" aria-label="My Claims" title="My Claims">
+          <RouterLink to="/liked-products" class="nav__icon-btn" aria-label="Liked Products" title="Liked Products">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
             </svg>
@@ -107,7 +107,12 @@ function closeMobile() { mobileOpen.value = false }
         <hr class="mobile-nav__divider" />
 
         <template v-if="auth.isLoggedIn && auth.isCustomer">
-          <RouterLink to="/my-claims"  class="mobile-nav__link" @click="closeMobile">My Claims</RouterLink>
+          <RouterLink to="/liked-products" class="mobile-nav__link mobile-nav__link--liked" @click="closeMobile">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            <span>Liked Products</span>
+          </RouterLink>
           <RouterLink to="/my-orders"  class="mobile-nav__link" @click="closeMobile">My Orders</RouterLink>
           <RouterLink to="/profile"    class="mobile-nav__link" @click="closeMobile">Profile</RouterLink>
           <button class="mobile-nav__signout" @click="handleLogout">Sign Out</button>
@@ -309,6 +314,12 @@ function closeMobile() { mobileOpen.value = false }
 .mobile-nav__link:hover,
 .mobile-nav__link.router-link-active { color: var(--color-seashell); }
 .mobile-nav__link--admin { color: var(--color-spice-market); }
+.mobile-nav__link--liked {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  color: var(--color-spice-market);
+}
 
 .mobile-nav__divider {
   border: none;

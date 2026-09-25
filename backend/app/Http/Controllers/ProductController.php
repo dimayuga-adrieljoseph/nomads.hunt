@@ -49,6 +49,14 @@ class ProductController extends Controller
             $query->where('status', $status);
         }
 
+        // Resolve an optional Sanctum user so the catalog can include user-specific
+        // like state without one request per product card.
+        if ($user = $request->user('sanctum')) {
+            $query->withExists([
+                'likes as is_liked' => fn ($likes) => $likes->where('user_id', $user->id),
+            ]);
+        }
+
         $products = $query->latest()->paginate(12);
 
         return ProductResource::collection($products);
@@ -62,6 +70,12 @@ class ProductController extends Controller
         // Release anything that expired, then make sure the status matches reality
         $this->claimService->expireOverdueClaimsForProduct($product->id);
         $this->claimService->reconcileProductStatus($product);
+
+        if ($user = $request->user('sanctum')) {
+            $product->loadExists([
+                'likes as is_liked' => fn ($likes) => $likes->where('user_id', $user->id),
+            ]);
+        }
 
         $activeClaim = $product->activeClaim();
 

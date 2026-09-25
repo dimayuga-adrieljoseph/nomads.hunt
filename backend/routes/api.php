@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin;
+use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClaimController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductLikeController;
 use Illuminate\Support\Facades\Route;
 
 // ── Health ────────────────────────────────────────────────────────────────────
@@ -30,6 +33,11 @@ Route::get('/products/{product}',      [ProductController::class, 'show']);
 // Public claim history for a product (used on product detail page)
 Route::get('/products/{product}/claims', [ClaimController::class, 'productClaims']);
 
+// Public homepage announcement — only the deterministic active item is exposed.
+Route::get('/announcements/active', [AnnouncementController::class, 'active']);
+Route::get('/announcements', [AnnouncementController::class, 'index']);
+Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show']);
+
 // ── Authenticated routes ───────────────────────────────────────────────────────
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -46,6 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/my-claims',            [ClaimController::class, 'myClaims']);
         Route::get('/my-orders',            [OrderController::class, 'myOrders']);
+
+        Route::get('/likes',                         [ProductLikeController::class, 'index']);
+        Route::post('/products/{product}/like',      [ProductLikeController::class, 'store']);
+        Route::delete('/products/{product}/like',   [ProductLikeController::class, 'destroy']);
         Route::get('/orders/{order}',       [OrderController::class, 'show']);
         Route::post('/orders/{order}/pay',  [OrderController::class, 'pay']);
     });
@@ -55,6 +67,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('admin')->prefix('admin')->group(function () {
 
         Route::get('/dashboard', [Admin\DashboardController::class, 'index']);
+
+        // Announcements
+        Route::get('/announcements', [AdminAnnouncementController::class, 'index']);
+        Route::post('/announcements', [AdminAnnouncementController::class, 'store']);
+        Route::get('/announcements/{announcement}', [AdminAnnouncementController::class, 'show']);
+        Route::put('/announcements/{announcement}', [AdminAnnouncementController::class, 'update']);
+        Route::delete('/announcements/{announcement}', [AdminAnnouncementController::class, 'destroy']);
+        Route::post('/announcements/{announcement}/upload-image', [AdminAnnouncementController::class, 'uploadImage']);
+        Route::post('/announcements/{announcement}/publish', [AdminAnnouncementController::class, 'publish']);
+        Route::post('/announcements/{announcement}/unpublish', [AdminAnnouncementController::class, 'unpublish']);
+        Route::post('/announcements/{announcement}/archive', [AdminAnnouncementController::class, 'archive']);
 
         // Products
         Route::get('/products',                           [Admin\ProductController::class, 'index']);

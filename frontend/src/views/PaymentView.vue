@@ -158,7 +158,7 @@ onMounted(load)
 
         <p class="payment-meta">Placed {{ formatDate(order.created_at) }}</p>
 
-        <RouterLink to="/my-claims" class="payment-back">← Back to My Claims</RouterLink>
+        <RouterLink to="/liked-products" class="payment-back">← Back to Liked Products</RouterLink>
       </div>
     </div>
   </div>
